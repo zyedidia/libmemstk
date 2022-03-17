@@ -33,4 +33,6 @@ int main() {
 
     memstk_pop(p);
     dump(p, 4);
+
+    memstk_free(p);
 }
