@@ -161,5 +161,5 @@ void memstk_free(void* p) {
     free(stk->entries);
     size_t datasz = stk->datasz;
     free(stk);
-    munmap(get_alloc(p), datasz);
+    munmap(get_alloc(p), datasz + sizeof(metadata_t));
 }
