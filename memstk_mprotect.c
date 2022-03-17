@@ -31,6 +31,7 @@ typedef struct {
     size_t cap;
 } memstk_t;
 
+// magic is currently not used, but could be used for verifying metadata
 #define MAGIC 0xdeadbeef
 
 typedef struct {

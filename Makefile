@@ -1,9 +1,8 @@
 PROG = main
+MEMSTK = memstk_mprotect
 all: $(PROG)
 
 include rules.mk
-
-MEMSTK = memstk_mprotect
 
 SRC = $(wildcard *.c)
 
