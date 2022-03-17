@@ -5,11 +5,6 @@ include rules.mk
 
 MEMSTK = memstk_mprotect
 
-INCDIR = include
-INC = $(INCDIR)
-INC_PARAMS=$(foreach d, $(INC), -I$d)
-CFLAGS += $(INC_PARAMS)
-
 SRC = $(wildcard *.c)
 
 %.o: %.c $(BUILDSTAMP)
