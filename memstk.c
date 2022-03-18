@@ -9,20 +9,22 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "protect.h"
+
 static int page_size;
 
 typedef struct {
     // if the memory has been written, the original memory is saved here
     void* original;
     // the protections when this stack entry was created
-    int prot;
+    prot_t prot;
 } mement_t;
 
 typedef struct {
     // size of the memory block
     size_t datasz;
     // current protections of the memory block
-    int prot;
+    prot_t prot;
 
     // stack entries, each with protections at the time of push and the
     // original data (if modified)
@@ -40,13 +42,10 @@ typedef struct {
 } metadata_t;
 
 // receive write protection faults here
-static void handler(int signo, siginfo_t* info, void* context) {
-    (void) signo;
-    (void) context;
-
+static void handler(uintptr_t addr) {
     // calculate the base of the allocation by rounding down to the nearest
     // page-aligned address
-    uintptr_t alloc = (uintptr_t) info->si_addr & ~(page_size - 1);
+    uintptr_t alloc = addr & ~(page_size - 1);
     metadata_t* mdat = (metadata_t*) alloc;
 
     size_t top = mdat->stk->sz - 1;
@@ -54,10 +53,9 @@ static void handler(int signo, siginfo_t* info, void* context) {
     void* original = malloc(mdat->stk->datasz);
     memcpy(original, (void*) (alloc + sizeof(metadata_t)), mdat->stk->datasz);
     mdat->stk->entries[top].original = original;
-    mdat->stk->prot = PROT_READ | PROT_WRITE;
+    mdat->stk->prot = PROT_RW;
 
-    mprotect((void*) alloc, mdat->stk->datasz + sizeof(metadata_t),
-             PROT_READ | PROT_WRITE);
+    mprot_protect_mem((void*) alloc, mdat->stk->datasz + sizeof(metadata_t), PROT_RW);
 }
 
 // Must be called before using memstk. Installs a SIGSEGV handler to handle
@@ -65,14 +63,7 @@ static void handler(int signo, siginfo_t* info, void* context) {
 void memstk_init() {
     page_size = sysconf(_SC_PAGE_SIZE);
 
-    struct sigaction act = {0};
-
-    act.sa_flags = SA_SIGINFO;
-    act.sa_sigaction = &handler;
-    if (sigaction(SIGSEGV, &act, NULL) == -1) {
-        perror("sigaction");
-        exit(EXIT_FAILURE);
-    }
+    mprot_init(handler);
 }
 
 // Allocate a block of sz bytes.
@@ -85,6 +76,9 @@ void* memstk_alloc(size_t sz) {
     char* alloc =
         (char*) mmap(NULL, sz + sizeof(metadata_t), PROT_READ | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+
+    mprot_register_mem(alloc, sz + sizeof(metadata_t));
+
     memstk_t* stk = (memstk_t*) malloc(sizeof(memstk_t));
     *stk = (memstk_t){
         .datasz = sz,
@@ -131,8 +125,8 @@ void memstk_push(void* p) {
         .original = NULL,
         .prot = stk->prot,
     };
-    mprotect(get_alloc(p), stk->datasz + sizeof(metadata_t), PROT_READ);
-    stk->prot = PROT_READ;
+    mprot_protect_mem(get_alloc(p), stk->datasz + sizeof(metadata_t), PROT_R);
+    stk->prot = PROT_R;
     stk->sz++;
 }
 
@@ -144,8 +138,7 @@ void memstk_pop(void* p) {
         memcpy(p, stk->entries[top].original, stk->datasz);
         free(stk->entries[top].original);
     }
-    mprotect(get_alloc(p), stk->datasz + sizeof(metadata_t),
-             stk->entries[top].prot);
+    mprot_protect_mem(get_alloc(p), stk->datasz + sizeof(metadata_t), stk->entries[top].prot);
     stk->prot = stk->entries[top].prot;
     stk->sz--;
 }

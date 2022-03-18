@@ -1,5 +1,6 @@
 PROG = main
-MEMSTK = memstk_mprotect
+MEMSTK = memstk.o
+PROTECT ?= mprotect.o
 all: $(PROG)
 
 include rules.mk
@@ -9,7 +10,7 @@ SRC = $(wildcard *.c)
 %.o: %.c $(BUILDSTAMP)
 	$(CC) $(CFLAGS) $(O) $(DEPCFLAGS) -o $@ -c $<
 
-$(PROG): $(PROG).o $(MEMSTK).o
+$(PROG): $(PROG).o $(MEMSTK) $(PROTECT)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(O) -o $@ $^
 
 # for inspecting assembly
