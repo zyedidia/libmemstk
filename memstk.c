@@ -180,6 +180,8 @@ void memstk_pop(void* p) {
             stk->prots[i] = prot;
         }
     }
+    free(stk->entries[top].prots);
+    free(stk->entries[top].backups);
     stk->sz--;
 }
 
@@ -190,6 +192,7 @@ void memstk_free(void* p) {
             for (size_t j = 0; j < stk->entries[i].sz; j++) {
                 free(stk->entries[i].backups[j].data);
             }
+            free(stk->entries[i].backups);
         }
         free(stk->entries[i].prots);
     }
