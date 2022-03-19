@@ -1,15 +1,15 @@
 #define _GNU_SOURCE
 
-#include <linux/userfaultfd.h>
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/syscall.h>
 #include <fcntl.h>
-#include <unistd.h>
-#include <pthread.h>
+#include <linux/userfaultfd.h>
 #include <poll.h>
-#include <stdlib.h>
+#include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <sys/ioctl.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "protect.h"
 
@@ -24,7 +24,7 @@ static void* fault_handler_thread(void* arg) {
     thread_args_t* args = (thread_args_t*) arg;
 
     while (1) {
-        struct pollfd pollfd = (struct pollfd) {
+        struct pollfd pollfd = (struct pollfd){
             .fd = args->uffd,
             .events = POLLIN,
         };
@@ -46,7 +46,7 @@ int mprot_init(void (*fault_handler)(uintptr_t)) {
         return -1;
     }
 
-    struct uffdio_api uffdio_api = (struct uffdio_api) {
+    struct uffdio_api uffdio_api = (struct uffdio_api){
         .api = UFFD_API,
         .features = UFFD_FEATURE_PAGEFAULT_FLAG_WP,
     };
@@ -69,22 +69,24 @@ int mprot_init(void (*fault_handler)(uintptr_t)) {
 }
 
 int mprot_register_mem(void* p, size_t sz) {
-    struct uffdio_register reg = (struct uffdio_register) {
-        .range = {
-            .start = (unsigned long) p,
-            .len = sz,
-        },
+    struct uffdio_register reg = (struct uffdio_register){
+        .range =
+            {
+                .start = (unsigned long) p,
+                .len = sz,
+            },
         .mode = UFFDIO_REGISTER_MODE_WP,
     };
     return ioctl(uffd, UFFDIO_REGISTER, &reg);
 }
 
 int mprot_protect_mem(void* p, size_t sz, prot_t prot) {
-    struct uffdio_writeprotect wp = (struct uffdio_writeprotect) {
-        .range = {
-            .start = (unsigned long) p,
-            .len = sz,
-        },
+    struct uffdio_writeprotect wp = (struct uffdio_writeprotect){
+        .range =
+            {
+                .start = (unsigned long) p,
+                .len = sz,
+            },
         .mode = prot == PROT_RW ? UFFDIO_WRITEPROTECT_MODE_WP : 0,
     };
     return ioctl(uffd, UFFDIO_WRITEPROTECT, &wp);

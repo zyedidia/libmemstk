@@ -1,8 +1,8 @@
 #define _GNU_SOURCE
 
-#include <sys/mman.h>
-#include <string.h>
 #include <signal.h>
+#include <string.h>
+#include <sys/mman.h>
 
 #include "protect.h"
 

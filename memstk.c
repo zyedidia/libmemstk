@@ -11,148 +11,193 @@
 
 #include "protect.h"
 
-static int page_size;
+typedef struct {
+    void* data;
+    uintptr_t addr;
+} backup_t;
 
 typedef struct {
-    // if the memory has been written, the original memory is saved here
-    void* original;
-    // the protections when this stack entry was created
-    prot_t prot;
+    backup_t* backups;
+    size_t sz;
+    size_t cap;
+
+    // original protections for each page at time of push
+    prot_t* prots;
 } mement_t;
 
-typedef struct {
-    // size of the memory block
-    size_t datasz;
-    // current protections of the memory block
-    prot_t prot;
+void mement_append(mement_t* ent, backup_t backup) {
+    if (ent->sz >= ent->cap) {
+        ent->cap = ent->cap == 0 ? 1 : ent->cap * 2;
+        ent->backups = realloc(ent->backups, sizeof(backup_t) * ent->cap);
+    }
 
-    // stack entries, each with protections at the time of push and the
-    // original data (if modified)
+    ent->backups[ent->sz] = backup;
+    ent->sz++;
+}
+
+typedef struct {
+    uintptr_t addr;
+    size_t npages;
+    // list of protections for each page
+    prot_t* prots;
+
     mement_t* entries;
     size_t sz;
     size_t cap;
 } memstk_t;
 
-// magic is currently not used, but could be used for verifying metadata
-#define MAGIC 0xdeadbeef
-
-typedef struct {
-    memstk_t* stk;
-    uint32_t magic;
+typedef struct metadata {
+    memstk_t stk;
+    struct metadata* next;
+    struct metadata* prev;
 } metadata_t;
+
+static metadata_t* head;
+
+static void mdat_insert_head(metadata_t* n) {
+    n->next = head;
+    n->prev = NULL;
+    if (head)
+        head->prev = n;
+    head = n;
+}
+
+static void mdat_remove(metadata_t* n) {
+    if (n->next)
+        n->next->prev = n->prev;
+    if (n->prev)
+        n->prev->next = n->next;
+    else
+        head = n->next;
+}
+
+static int page_size;
 
 // receive write protection faults here
 static void handler(uintptr_t addr) {
-    // calculate the base of the allocation by rounding down to the nearest
-    // page-aligned address
-    uintptr_t alloc = addr & ~(page_size - 1);
-    metadata_t* mdat = (metadata_t*) alloc;
+    metadata_t* mdat = head;
+    while (mdat) {
+        memstk_t* stk = &mdat->stk;
 
-    size_t top = mdat->stk->sz - 1;
-    // make a backup of the data before marking the memory as writable
-    void* original = malloc(mdat->stk->datasz);
-    memcpy(original, (void*) (alloc + sizeof(metadata_t)), mdat->stk->datasz);
-    mdat->stk->entries[top].original = original;
-    mdat->stk->prot = PROT_RW;
+        if (addr >= stk->addr && addr < (stk->addr + stk->npages * page_size)) {
+            // get the page corresponding to this write
+            uintptr_t page_addr = addr & ~(page_size - 1);
+            // page number within the matching allocation
+            size_t page = (page_addr - stk->addr) / page_size;
+            // make a backup page
+            void* backup = malloc(page_size);
+            memcpy(backup, (void*) page_addr, page_size);
+            mement_append(&stk->entries[stk->sz - 1], (backup_t){
+                                                          .data = backup,
+                                                          .addr = page_addr,
+                                                      });
+            // now that we have a backup, make the page R/W
+            stk->prots[page] = PROT_RW;
+            mprot_protect_mem((void*) page_addr, page_size, PROT_RW);
+            break;
+        }
 
-    mprot_protect_mem((void*) alloc, mdat->stk->datasz + sizeof(metadata_t), PROT_RW);
+        mdat = mdat->next;
+    }
 }
 
-// Must be called before using memstk. Installs a SIGSEGV handler to handle
-// attempts to write to mprotected memory.
 void memstk_init() {
     page_size = sysconf(_SC_PAGE_SIZE);
-
     mprot_init(handler);
 }
 
-// Allocate a block of sz bytes.
-// Requirement: sz <= page_size - sizeof(metadata_t)
-void* memstk_alloc(size_t sz) {
-    if (sz > page_size - sizeof(metadata_t)) {
+static void* memstk_alloc_pages(size_t npages) {
+    metadata_t* mdat = (metadata_t*) mmap(NULL, (npages + 1) * page_size,
+                                          PROT_READ | PROT_WRITE,
+                                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (!mdat) {
+        return NULL;
+    }
+    char* alloc = (char*) mdat + page_size;
+    if (mprot_register_mem(alloc, npages * page_size) == -1) {
         return NULL;
     }
 
-    char* alloc =
-        (char*) mmap(NULL, sz + sizeof(metadata_t), PROT_READ | PROT_WRITE,
-                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    mdat_insert_head(mdat);
 
-    mprot_register_mem(alloc, sz + sizeof(metadata_t));
-
-    memstk_t* stk = (memstk_t*) malloc(sizeof(memstk_t));
-    *stk = (memstk_t){
-        .datasz = sz,
-        .prot = PROT_READ | PROT_WRITE,
+    mdat->stk = (memstk_t){
+        .addr = (uintptr_t) alloc,
+        .npages = npages,
+        .prots = (prot_t*) malloc(sizeof(prot_t) * npages),
         .entries = NULL,
         .sz = 0,
         .cap = 0,
     };
-    *((metadata_t*) alloc) = (metadata_t){
-        .stk = stk,
-        .magic = MAGIC,
-    };
 
-    return (void*) (alloc + sizeof(metadata_t));
+    return alloc;
 }
 
-static void* get_alloc(void* p) {
-    return (char*) p - sizeof(metadata_t);
+void* memstk_alloc(size_t sz) {
+    return memstk_alloc_pages((sz + page_size - 1) / page_size);
 }
 
-static memstk_t* get_stk(void* p) {
-    return ((metadata_t*) get_alloc(p))->stk;
+static metadata_t* get_mdat(void* p) {
+    return (metadata_t*) ((char*) p - page_size);
 }
 
-static void memstk_double(memstk_t* stk) {
-    if (stk->cap == 0) {
-        stk->cap = 1;
-    } else {
-        stk->cap *= 2;
-    }
-    stk->entries =
-        (mement_t*) realloc(stk->entries, sizeof(mement_t) * stk->cap);
-}
-
-// Save the current state of allocation 'p'.
 void memstk_push(void* p) {
-    memstk_t* stk = get_stk(p);
+    metadata_t* mdat = get_mdat(p);
 
-    if (stk->sz >= stk->cap) {
-        memstk_double(stk);
+    if (mdat->stk.sz >= mdat->stk.cap) {
+        mdat->stk.cap = mdat->stk.cap == 0 ? 1 : mdat->stk.cap * 2;
+        mdat->stk.entries =
+            realloc(mdat->stk.entries, mdat->stk.cap * sizeof(mement_t));
     }
 
-    stk->entries[stk->sz] = (mement_t){
-        .original = NULL,
-        .prot = stk->prot,
+    prot_t* prots = malloc(sizeof(prot_t) * mdat->stk.npages);
+    memcpy(prots, mdat->stk.prots, sizeof(prot_t) * mdat->stk.npages);
+
+    mdat->stk.entries[mdat->stk.sz] = (mement_t){
+        .backups = NULL,
+        .sz = 0,
+        .cap = 0,
+        .prots = prots,
     };
-    mprot_protect_mem(get_alloc(p), stk->datasz + sizeof(metadata_t), PROT_R);
-    stk->prot = PROT_R;
-    stk->sz++;
+    memset(prots, PROT_R, sizeof(prot_t) * mdat->stk.npages);
+    mprot_protect_mem(p, mdat->stk.npages * page_size, PROT_R);
+    mdat->stk.sz++;
 }
 
-// Return allocation 'p' its state at the time of the most recent push.
 void memstk_pop(void* p) {
-    memstk_t* stk = get_stk(p);
+    memstk_t* stk = &get_mdat(p)->stk;
     size_t top = stk->sz - 1;
-    if (stk->entries[top].original) {
-        memcpy(p, stk->entries[top].original, stk->datasz);
-        free(stk->entries[top].original);
+    if (stk->entries[top].sz > 0) {
+        for (size_t i = 0; i < stk->entries[top].sz; i++) {
+            backup_t* backup = &stk->entries[top].backups[i];
+            memcpy((void*) backup->addr, backup->data, page_size);
+            free(backup->data);
+        }
     }
-    mprot_protect_mem(get_alloc(p), stk->datasz + sizeof(metadata_t), stk->entries[top].prot);
-    stk->prot = stk->entries[top].prot;
+    for (size_t i = 0; i < stk->npages; i++) {
+        prot_t prot = stk->entries[top].prots[i];
+        if (stk->prots[i] != prot) {
+            mprot_protect_mem(p, page_size, stk->prots[i]);
+            stk->prots[i] = prot;
+        }
+    }
     stk->sz--;
 }
 
-// Free allocation 'p'.
 void memstk_free(void* p) {
-    memstk_t* stk = get_stk(p);
+    memstk_t* stk = &get_mdat(p)->stk;
     for (size_t i = 0; i < stk->sz; i++) {
-        if (stk->entries[i].original) {
-            free(stk->entries[i].original);
+        if (stk->entries[i].sz > 0) {
+            for (size_t j = 0; j < stk->entries[i].sz; j++) {
+                free(stk->entries[i].backups[j].data);
+            }
         }
+        free(stk->entries[i].prots);
     }
     free(stk->entries);
-    size_t datasz = stk->datasz;
-    free(stk);
-    munmap(get_alloc(p), datasz + sizeof(metadata_t));
+    free(stk->prots);
+
+    size_t npages = stk->npages;
+    metadata_t* mdat = get_mdat(p);
+    mdat_remove(mdat);
+    munmap((void*) mdat, (npages + 1) * page_size);
 }
