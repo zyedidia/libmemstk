@@ -1,8 +1,8 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <assert.h>
 
 #include "memstk.h"
 
@@ -53,7 +53,8 @@ static void xcheck_check(xcheck_t* x) {
 }
 
 static void xcheck_modify(xcheck_t* x) {
-    if (DEBUG) printf("modify\n");
+    if (DEBUG)
+        printf("modify\n");
     const int nchanges = 100;
     for (int j = 0; j < nchanges; j++) {
         unsigned idx = rand() % x->sz;
@@ -65,14 +66,16 @@ static void xcheck_modify(xcheck_t* x) {
 }
 
 static void xcheck_push(xcheck_t* x) {
-    if (DEBUG) printf("push\n");
+    if (DEBUG)
+        printf("push\n");
     for (size_t i = 0; i < x->n; i++) {
         x->mappers[i].push(x->ptrs[i]);
     }
 }
 
 static void xcheck_pop(xcheck_t* x) {
-    if (DEBUG) printf("pop\n");
+    if (DEBUG)
+        printf("pop\n");
     for (size_t i = 0; i < x->n; i++) {
         x->mappers[i].pop(x->ptrs[i]);
     }
