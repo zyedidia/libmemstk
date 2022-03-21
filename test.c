@@ -95,10 +95,10 @@ int main() {
     };
     xcheck_init(&x);
     int page_size = sysconf(_SC_PAGE_SIZE);
-    const int npages = 1;
+    const int npages = 10;
     xcheck_map(&x, page_size * npages);
 
-    const int nops = 1000;
+    const int nops = 10000;
 
     for (int i = 0; i < nops; i++) {
         int op = rand() % 3;

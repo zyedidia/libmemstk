@@ -178,16 +178,16 @@ static void memstk_pop(void* p) {
     if (stk->entries[top].sz > 0) {
         for (size_t i = 0; i < stk->entries[top].sz; i++) {
             backup_t* backup = &stk->entries[top].backups[i];
+            mprot_protect_mem((void*) backup->addr, page_size, PROT_RW);
             memcpy((void*) backup->addr, backup->data, page_size);
             free(backup->data);
         }
     }
     for (size_t i = 0; i < stk->npages; i++) {
         prot_t prot = stk->entries[top].prots[i];
-        if (stk->prots[i] != prot) {
-            mprot_protect_mem(p, page_size, prot);
-            stk->prots[i] = prot;
-        }
+        // TODO: optimization: only re-protect memory if necessary
+        mprot_protect_mem(p + i * page_size, page_size, prot);
+        stk->prots[i] = prot;
     }
     free(stk->entries[top].prots);
     free(stk->entries[top].backups);
