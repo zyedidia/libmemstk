@@ -1,8 +1,12 @@
+#define _GNU_SOURCE
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
+#include <stdint.h>
 
 #include "memstk.h"
 
@@ -14,6 +18,12 @@ typedef struct {
     size_t n;
     size_t sz;
 } xcheck_t;
+
+uint64_t get_time_ns() {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1000 * 1000 * 1000 + t.tv_nsec;
+}
 
 static void xcheck_init(xcheck_t* x) {
     for (size_t i = 0; i < x->n; i++) {
