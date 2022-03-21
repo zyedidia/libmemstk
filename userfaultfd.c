@@ -22,6 +22,8 @@ typedef struct {
 
 extern int page_size;
 
+extern void (*handler)(uintptr_t);
+
 static void* fault_handler_thread(void* arg) {
     thread_args_t* args = (thread_args_t*) arg;
 
@@ -30,15 +32,21 @@ static void* fault_handler_thread(void* arg) {
             .fd = args->uffd,
             .events = POLLIN,
         };
-        printf("Entering poll\n");
         int nready = poll(&pollfd, 1, -1);
         if (nready == -1) {
             exit(EXIT_FAILURE);
         }
 
-        printf("fault_handler_thread\n");
-        exit(EXIT_FAILURE);
-        /* args->fault_handler(); */
+        struct uffd_msg msg; /* Data read from userfaultfd */
+        ssize_t nread = read(uffd, &msg, sizeof(msg));
+        if (nread == 0) {
+            printf("EOF on userfaultfd!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        uintptr_t addr = msg.arg.pagefault.address;
+
+        args->fault_handler(addr);
     }
 }
 
