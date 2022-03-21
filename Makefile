@@ -1,6 +1,7 @@
 PROG = main
 MEMSTK = memstk.o
 PROTECT ?= mprotect.o
+# PROTECT ?= userfaultfd.o
 all: $(PROG)
 
 include rules.mk
