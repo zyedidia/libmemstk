@@ -20,6 +20,8 @@ typedef struct {
     void (*fault_handler)(uintptr_t);
 } thread_args_t;
 
+extern int page_size;
+
 static void* fault_handler_thread(void* arg) {
     thread_args_t* args = (thread_args_t*) arg;
 
@@ -77,7 +79,18 @@ int mprot_register_mem(void* p, size_t sz) {
             },
         .mode = UFFDIO_REGISTER_MODE_WP,
     };
-    return ioctl(uffd, UFFDIO_REGISTER, &reg);
+    int r = ioctl(uffd, UFFDIO_REGISTER, &reg);
+    if (r == -1) {
+        return -1;
+    }
+
+    // touch every page in the memory to register it (undocumented "feature").
+    char* b = (char*) p;
+    for (size_t i = 0; i < sz; i += page_size) {
+        b[i] = 0;
+    }
+
+    return 0;
 }
 
 int mprot_protect_mem(void* p, size_t sz, prot_t prot) {
