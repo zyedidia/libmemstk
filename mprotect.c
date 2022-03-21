@@ -4,7 +4,7 @@
 #include <string.h>
 #include <sys/mman.h>
 
-#include "protect.h"
+#include "mprot.h"
 
 int mprot_register_mem(void* p, size_t sz) {
     (void) p;

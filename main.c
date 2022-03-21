@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "memstk.h"
 
@@ -10,9 +11,17 @@ void dump(char* p, size_t sz) {
 }
 
 int main() {
-    memstk_init();
+    if (memstk_init() == -1) {
+        perror("memstk_init");
+        exit(EXIT_FAILURE);
+    }
 
     char* p = memstk_alloc(4);
+    if (!p) {
+        perror("memstk_alloc");
+        exit(EXIT_FAILURE);
+    }
+
     printf("Allocated: %p\n", p);
     memset(p, 0, 4);
 

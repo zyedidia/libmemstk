@@ -2,3 +2,4 @@
 *.s
 main
 .deps
+.vagrant

@@ -9,7 +9,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include "protect.h"
+#include "mprot.h"
 
 typedef struct {
     void* data;
@@ -101,9 +101,9 @@ static void handler(uintptr_t addr) {
     }
 }
 
-void memstk_init() {
+int memstk_init() {
     page_size = sysconf(_SC_PAGE_SIZE);
-    mprot_init(handler);
+    return mprot_init(handler);
 }
 
 static void* memstk_alloc_pages(size_t npages) {

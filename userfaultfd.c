@@ -11,7 +11,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "protect.h"
+#include "mprot.h"
 
 static long uffd;
 
@@ -38,7 +38,7 @@ static void* fault_handler_thread(void* arg) {
         }
 
         struct uffd_msg msg; /* Data read from userfaultfd */
-        ssize_t nread = read(uffd, &msg, sizeof(msg));
+        ssize_t nread = read(args->uffd, &msg, sizeof(msg));
         if (nread == 0) {
             printf("EOF on userfaultfd!\n");
             exit(EXIT_FAILURE);
