@@ -71,7 +71,7 @@ static void mdat_remove(metadata_t* n) {
         head = n->next;
 }
 
-static int page_size;
+int page_size;
 
 // receive write protection faults here
 static void handler(uintptr_t addr) {

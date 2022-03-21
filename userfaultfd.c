@@ -100,7 +100,7 @@ int mprot_protect_mem(void* p, size_t sz, prot_t prot) {
                 .start = (unsigned long) p,
                 .len = sz,
             },
-        .mode = prot == PROT_RW ? UFFDIO_WRITEPROTECT_MODE_WP : 0,
+        .mode = prot == PROT_R ? UFFDIO_WRITEPROTECT_MODE_WP : 0,
     };
     return ioctl(uffd, UFFDIO_WRITEPROTECT, &wp);
 }
