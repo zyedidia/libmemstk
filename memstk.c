@@ -106,7 +106,7 @@ int memstk_init() {
     return mprot_init(handler);
 }
 
-static void* memstk_alloc_pages(size_t npages) {
+static void* memstk_map_pages(size_t npages) {
     metadata_t* mdat = (metadata_t*) mmap(NULL, (npages + 1) * page_size,
                                           PROT_READ | PROT_WRITE,
                                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -132,8 +132,8 @@ static void* memstk_alloc_pages(size_t npages) {
     return alloc;
 }
 
-void* memstk_alloc(size_t sz) {
-    return memstk_alloc_pages((sz + page_size - 1) / page_size);
+void* memstk_map(size_t sz) {
+    return memstk_map_pages((sz + page_size - 1) / page_size);
 }
 
 static metadata_t* get_mdat(void* p) {

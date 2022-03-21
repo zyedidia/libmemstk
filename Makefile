@@ -1,7 +1,7 @@
 PROG = main
-MEMSTK = memstk.o
-# PROTECT ?= mprotect.o
-PROTECT ?= userfaultfd.o
+OBJ = memstk.o mprotect.o
+# OBJ = memstk.o userfaultfd.o
+# OBJ = memstk_basic.o
 all: $(PROG)
 
 include rules.mk
@@ -11,7 +11,7 @@ SRC = $(wildcard *.c)
 %.o: %.c $(BUILDSTAMP)
 	$(CC) $(CFLAGS) $(O) $(DEPCFLAGS) -o $@ -c $<
 
-$(PROG): $(PROG).o $(MEMSTK) $(PROTECT)
+$(PROG): $(PROG).o $(OBJ)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(O) -o $@ $^
 
 # for inspecting assembly

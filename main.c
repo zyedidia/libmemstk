@@ -16,9 +16,9 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    char* p = memstk_alloc(4);
+    char* p = memstk_map(4);
     if (!p) {
-        perror("memstk_alloc");
+        perror("memstk_map");
         exit(EXIT_FAILURE);
     }
 
