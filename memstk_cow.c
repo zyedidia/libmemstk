@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "memstk.h"
 #include "mprot.h"
 
 typedef struct {
@@ -101,7 +102,7 @@ static void handler(uintptr_t addr) {
     }
 }
 
-int memstk_init() {
+static int memstk_init() {
     page_size = sysconf(_SC_PAGE_SIZE);
     return mprot_init(handler);
 }
@@ -128,11 +129,14 @@ static void* memstk_map_pages(size_t npages) {
         .sz = 0,
         .cap = 0,
     };
+    for (size_t i = 0; i < npages; i++) {
+        mdat->stk.prots[i] = PROT_RW;
+    }
 
     return alloc;
 }
 
-void* memstk_map(size_t sz) {
+static void* memstk_map(size_t sz) {
     return memstk_map_pages((sz + page_size - 1) / page_size);
 }
 
@@ -140,7 +144,7 @@ static metadata_t* get_mdat(void* p) {
     return (metadata_t*) ((char*) p - page_size);
 }
 
-void memstk_push(void* p) {
+static void memstk_push(void* p) {
     metadata_t* mdat = get_mdat(p);
 
     if (mdat->stk.sz >= mdat->stk.cap) {
@@ -158,13 +162,18 @@ void memstk_push(void* p) {
         .cap = 0,
         .prots = prots,
     };
-    memset(prots, PROT_R, sizeof(prot_t) * mdat->stk.npages);
+    for (size_t i = 0; i < mdat->stk.npages; i++) {
+        mdat->stk.prots[i] = PROT_R;
+    }
     mprot_protect_mem(p, mdat->stk.npages * page_size, PROT_R);
     mdat->stk.sz++;
 }
 
-void memstk_pop(void* p) {
+static void memstk_pop(void* p) {
     memstk_t* stk = &get_mdat(p)->stk;
+    if (stk->sz == 0) {
+        return;
+    }
     size_t top = stk->sz - 1;
     if (stk->entries[top].sz > 0) {
         for (size_t i = 0; i < stk->entries[top].sz; i++) {
@@ -176,7 +185,7 @@ void memstk_pop(void* p) {
     for (size_t i = 0; i < stk->npages; i++) {
         prot_t prot = stk->entries[top].prots[i];
         if (stk->prots[i] != prot) {
-            mprot_protect_mem(p, page_size, stk->prots[i]);
+            mprot_protect_mem(p, page_size, prot);
             stk->prots[i] = prot;
         }
     }
@@ -185,7 +194,7 @@ void memstk_pop(void* p) {
     stk->sz--;
 }
 
-void memstk_free(void* p) {
+static void memstk_free(void* p) {
     memstk_t* stk = &get_mdat(p)->stk;
     for (size_t i = 0; i < stk->sz; i++) {
         if (stk->entries[i].sz > 0) {
@@ -203,4 +212,14 @@ void memstk_free(void* p) {
     metadata_t* mdat = get_mdat(p);
     mdat_remove(mdat);
     munmap((void*) mdat, (npages + 1) * page_size);
+}
+
+memstk_mapper_t memstk_cow() {
+    return (memstk_mapper_t){
+        .init = memstk_init,
+        .map = memstk_map,
+        .push = memstk_push,
+        .pop = memstk_pop,
+        .free = memstk_free,
+    };
 }

@@ -41,11 +41,11 @@ static void mdat_remove(metadata_t* n) {
         head = n->next;
 }
 
-int memstk_init() {
+static int memstk_init() {
     return 0;
 }
 
-void* memstk_map(size_t sz) {
+static void* memstk_map(size_t sz) {
     metadata_t* mdat = (metadata_t*) malloc(sz + sizeof(metadata_t));
     char* alloc = (char*) mdat + sizeof(metadata_t);
 
@@ -66,7 +66,7 @@ static metadata_t* get_mdat(void* p) {
     return (metadata_t*) ((char*) p - sizeof(metadata_t));
 }
 
-void memstk_push(void* p) {
+static void memstk_push(void* p) {
     metadata_t* mdat = get_mdat(p);
 
     if (mdat->stk.sz >= mdat->stk.cap) {
@@ -84,15 +84,18 @@ void memstk_push(void* p) {
     mdat->stk.sz++;
 }
 
-void memstk_pop(void* p) {
+static void memstk_pop(void* p) {
     memstk_t* stk = &get_mdat(p)->stk;
+    if (stk->sz == 0) {
+        return;
+    }
     size_t top = stk->sz - 1;
     memcpy(stk->data, stk->entries[top].data, stk->datasz);
     free(stk->entries[top].data);
     stk->sz--;
 }
 
-void memstk_free(void* p) {
+static void memstk_free(void* p) {
     memstk_t* stk = &get_mdat(p)->stk;
     for (size_t i = 0; i < stk->sz; i++) {
         free(stk->entries[i].data);
@@ -102,4 +105,14 @@ void memstk_free(void* p) {
     metadata_t* mdat = get_mdat(p);
     mdat_remove(mdat);
     free(mdat);
+}
+
+memstk_mapper_t memstk_basic() {
+    return (memstk_mapper_t){
+        .init = memstk_init,
+        .map = memstk_map,
+        .push = memstk_push,
+        .pop = memstk_pop,
+        .free = memstk_free,
+    };
 }

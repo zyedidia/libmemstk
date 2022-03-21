@@ -11,14 +11,16 @@ void dump(char* p, size_t sz) {
 }
 
 int main() {
-    if (memstk_init() == -1) {
-        perror("memstk_init");
+    memstk_mapper_t memstk = memstk_cow();
+
+    if (memstk.init() == -1) {
+        perror("memstk.init");
         exit(EXIT_FAILURE);
     }
 
-    char* p = memstk_map(4);
+    char* p = memstk.map(4);
     if (!p) {
-        perror("memstk_map");
+        perror("memstk.map");
         exit(EXIT_FAILURE);
     }
 
@@ -28,20 +30,20 @@ int main() {
     p[0] = 42;
     dump(p, 4);
 
-    memstk_push(p);
+    memstk.push(p);
 
     p[1] = 42;
     dump(p, 4);
 
-    memstk_push(p);
+    memstk.push(p);
     p[2] = 42;
     dump(p, 4);
-    memstk_pop(p);
+    memstk.pop(p);
 
     dump(p, 4);
 
-    memstk_pop(p);
+    memstk.pop(p);
     dump(p, 4);
 
-    memstk_free(p);
+    memstk.free(p);
 }

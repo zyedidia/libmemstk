@@ -1,5 +1,7 @@
 *.o
 *.s
 main
+test
 .deps
 .vagrant
+todo.txt
