@@ -108,7 +108,7 @@ int main() {
     };
     xcheck_init(&x);
     int page_size = sysconf(_SC_PAGE_SIZE);
-    const int npages = 10;
+    const int npages = 100;
     xcheck_map(&x, page_size * npages);
 
     const int nops = 10000;

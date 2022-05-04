@@ -1,6 +1,7 @@
 PROG = main
 
 MPROT ?= mprotect
+DUNE ?= ../dune
 
 ifeq ($(MPROT),mprotect)
 	OBJ = memstk_cow.o memstk_basic.o mprotect.o
@@ -8,8 +9,8 @@ else ifeq ($(MPROT),userfaultfd)
 	OBJ = memstk_cow.o memstk_basic.o userfaultfd.o
 else
 	OBJ = memstk_cow.o memstk_basic.o dune.o
-	CFLAGS += -I../dune
-	LDFLAGS += -static -L../dune/libdune -ldune
+	CFLAGS += -I$(DUNE)
+	LDFLAGS += -static -L$(DUNE)/libdune -ldune
 endif
 
 CC = gcc
