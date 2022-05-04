@@ -4,7 +4,7 @@ userfaultfd. The backend is selected in the Makefile.
 # mprotect
 
 Uses the `mprotect` system call and a sigsegv signal handler to handle faults. This version
-should work on any version of Linux, but may be slower than userfaultfd.
+should work on any version of Linux.
 
 # userfaultfd
 
@@ -25,3 +25,8 @@ $ vagrant up
 ...
 $ vagrant ssh
 ```
+
+# dune
+
+This implementation uses [Dune](https://github.com/project-dune/dune) to
+virtualize the process and allow it to handle its own page faults.
