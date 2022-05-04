@@ -1,5 +1,5 @@
 # compiler flags
-CFLAGS := -std=c11 -W -Wall -Wextra -Wshadow $(DEFS) $(CFLAGS)
+CFLAGS := -W -Wall -Wextra -Wshadow $(DEFS) $(CFLAGS)
 CXXFLAGS := -std=c++17 -W -Wall -Wextra -Wshadow $(DEFS) $(CXXFLAGS)
 
 O ?= -O2
