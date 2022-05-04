@@ -1,5 +1,6 @@
-This library can use two different backend implementations: mprotect and
-userfaultfd. The backend is selected in the Makefile.
+This library can use three different backend implementations: `mprotect`,
+`userfaultfd`, and `dune`. The backend is selected in the Makefile with the
+`MPROT` variable.
 
 # mprotect
 
